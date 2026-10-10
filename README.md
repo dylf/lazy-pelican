@@ -14,7 +14,7 @@ Starting is manual: players you've added as subusers can press Start in the pane
 
 ## Requirements
 - Pelican panel with the plugin system
-- `player-counter` plugin installed, with a Game Query linked to the egg
+- [player-counter](https://hub.pelican.dev/plugins/player-counter) plugin installed, with a Game Query linked to the egg
 - The panel's scheduler and queue worker running (`php artisan schedule:run` via cron)
 
 ## Setup (Valheim)
