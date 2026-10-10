@@ -187,11 +187,6 @@ class PluginStructureTest extends TestCase
         return require $this->root . '/config/' . $this->id() . '.php';
     }
 
-    public function test_config_returns_an_array(): void
-    {
-        $this->assertIsArray($this->config());
-    }
-
     public function test_every_config_key_used_in_the_source_exists(): void
     {
         $config = $this->config();

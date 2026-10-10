@@ -104,7 +104,7 @@ class IdleShutdownService
             $setting->forceFill(['empty_since' => $now])->save();
         }
 
-        $emptyFor = $setting->empty_since->diffInMinutes($now, true);
+        $emptyFor = (int) $setting->empty_since->diffInMinutes($now, true);
 
         if ($emptyFor < $setting->effectiveIdleMinutes()) {
             return "empty for $emptyFor/{$setting->effectiveIdleMinutes()} min";
@@ -144,7 +144,7 @@ class IdleShutdownService
 
         $data = $gameQuery->runQuery($server);
 
-        if (!$data || !array_key_exists('current_players', $data)) {
+        if (!$data) {
             return null;
         }
 

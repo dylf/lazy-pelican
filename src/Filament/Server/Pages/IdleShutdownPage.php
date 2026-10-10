@@ -68,7 +68,7 @@ class IdleShutdownPage extends ServerFormPage
 
         $hasPlayerCounter = IdleShutdownService::playerCounterAvailable();
 
-        // @phpstan-ignore property.notFound
+        // @phpstan-ignore method.notFound
         $hasQuery = $hasPlayerCounter && $server->egg->gameQuery()->exists();
 
         return $schema
