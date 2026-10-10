@@ -6,7 +6,7 @@ Starting is manual: players you've added as subusers can press Start in the pane
 ## How it works
 - Every minute a scheduled command (`lazy-pelican:check`) looks at each server that has idle shutdown enabled.
 - Player counts come from the **Player Counter** plugin's Game Query for the server's egg
-  (A2S/Source covers Valheim on the game port + 1, e.g. 2456 -> query 2457).
+  (A2S/Source for Valheim, the REST API for Palworld; see Games below).
 - Not running -> nothing happens. Running -> a startup grace period, then idle time is counted.
 - When the player count has been 0 for the idle time, a normal panel `stop` power action is sent
   (Valheim's egg stops with ^C, so the world is saved).
@@ -17,12 +17,46 @@ Starting is manual: players you've added as subusers can press Start in the pane
 - [player-counter](https://hub.pelican.dev/plugins/player-counter) plugin installed, with a Game Query linked to the egg
 - The panel's scheduler and queue worker running (`php artisan schedule:run` via cron)
 
-## Setup (Valheim)
-1. Install and enable `player-counter`. Admin -> Game Queries -> create one: type **Source**,
-   query port offset **1**, link it to the Valheim egg.
-2. Install this plugin (copy folder `lazy-pelican` to `plugins/`, `php artisan p:plugin:install`).
-3. Open the server -> **Idle Shutdown**, enable it, set minutes.
+## Setup
+1. Install and enable `player-counter`. Admin -> Game Queries -> create a query for your game (see below) and link it
+   to the egg. The seeder does not always create these, so check the list.
+2. Install this plugin (import the zip on the Plugins page, or copy folder `lazy-pelican` to `plugins/` and run
+   `php artisan p:plugin:install`).
+3. Open the server -> **Idle Shutdown**, enable it, set minutes. The page warns you if Player Counter or the
+   Game Query is missing.
 4. Give subusers the **Idle Shutdown** permission if they should manage it.
+
+## Games
+Idle Shutdown works with any game Player Counter can query. Tested so far:
+
+| Game | Game Query | Needs |
+|---|---|---|
+| Valheim | **Source**, query port offset **1** | **Public Server must be on** (see below) |
+| Palworld | **Palworld**, no offset | REST API enabled on the game port, plus an `ADMIN_PASSWORD` (see below) |
+
+If the player count can't be read, nothing is ever stopped, so a game that isn't set up correctly just never shuts
+down. It does not get stopped by mistake.
+
+### Valheim: Public Server must be on
+The Valheim server only answers the Steam query when `-public 1`. With Public Server off, the player count is
+unavailable and Idle Shutdown can never stop the server. With a password set, "public" only means the server is
+listed in the in-game browser. Use the **Source** query with offset 1 (game port 27000 -> query port 27001), and make
+sure the query port is also an allocation on the server so Docker maps it.
+
+### Palworld: enable the REST API
+Player Counter reads Palworld through its REST API (`/v1/api/info`, `/metrics`, `/players`), authenticating as `admin`
+with the server's `ADMIN_PASSWORD` variable. The REST API listens on the **same port as the game** (TCP, while the game
+is UDP), so Player Counter finds it on the server's allocation.
+
+The stock egg uses RCON and does not enable the REST API, but its config tool reads `REST_API_ENABLED` and
+`REST_API_PORT`. Without editing the egg, prefix the server's startup command (admin -> server -> Startup) with:
+
+```
+export REST_API_ENABLED=True REST_API_PORT={{SERVER_PORT}}; 
+```
+
+Check it works from the panel host: `curl -u admin:<ADMIN_PASSWORD> http://<ip>:<port>/v1/api/info`.
+Set a non-empty `ADMIN_PASSWORD` on the server, or the query returns nothing.
 
 ## Config (env)
 | Variable | Default |
@@ -31,39 +65,3 @@ Starting is manual: players you've added as subusers can press Start in the pane
 | `LAZY_PELICAN_DEFAULT_GRACE_MINUTES` | 10 |
 | `LAZY_PELICAN_VERBOSE` | false |
 
-Test by hand: `php artisan lazy-pelican:check -v`
-
-## Roadmap
-- Wake-on-connect via a node-side agent (separate component).
-
-## Releasing
-
-Releases are automated with [release-please](https://github.com/googleapis/release-please). Write commit messages in
-the conventional style (`feat: ...`, `fix: ...`, `feat!: ...` for breaking changes). On every push to `main` a
-"release" pull request is kept up to date with the next version (bumped in `plugin.json`) and a changelog.
-
-**To release, merge that pull request.** That creates the tag and GitHub Release, and the workflow then attaches
-`lazy-pelican.zip` (built with `git archive`; dev files are left out via `.gitattributes`) and an `update.json` with
-the version, download URL and SHA-256. The panel reads that file through `update_url` in `plugin.json`, so installed
-copies get the one-click Update button.
-
-CI (Pint, PHPStan, tests) runs on every push to `main` before release-please does, so a failing build can't produce a
-release. If it fails after a release PR is merged, fix it on `main`; the next successful run creates the release.
-
-One-time repo setting: Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests".
-
-## License
-
-MIT, see [LICENSE](LICENSE).
-
-## Development
-
-CI follows the official `pelican/plugins` setup (Pint and PHPStan against a checkout of the panel), plus a small PHPUnit suite.
-
-```bash
-composer install
-vendor/bin/pint --test     # code style
-vendor/bin/phpunit         # structure checks (no panel needed)
-```
-
-PHPStan only runs in CI, because it analyses against the panel's classes.
