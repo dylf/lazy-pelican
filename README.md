@@ -36,6 +36,22 @@ Test by hand: `php artisan lazy-pelican:check -v`
 ## Roadmap
 - Wake-on-connect via a node-side agent (separate component).
 
+## Releasing
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please). Write commit messages in
+the conventional style (`feat: ...`, `fix: ...`, `feat!: ...` for breaking changes). On every push to `main` a
+"release" pull request is kept up to date with the next version (bumped in `plugin.json`) and a changelog.
+
+**To release, merge that pull request.** That creates the tag and GitHub Release, and the workflow then attaches
+`lazy-pelican.zip` (built with `git archive`; dev files are left out via `.gitattributes`) and an `update.json` with
+the version, download URL and SHA-256. The panel reads that file through `update_url` in `plugin.json`, so installed
+copies get the one-click Update button.
+
+CI (Pint, PHPStan, tests) runs on every push to `main` before release-please does, so a failing build can't produce a
+release. If it fails after a release PR is merged, fix it on `main`; the next successful run creates the release.
+
+One-time repo setting: Settings > Actions > General > "Allow GitHub Actions to create and approve pull requests".
+
 ## License
 
 MIT, see [LICENSE](LICENSE).

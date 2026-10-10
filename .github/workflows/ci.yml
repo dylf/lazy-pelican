@@ -1,10 +1,9 @@
 name: CI
 
+# Runs on pull requests, and is called by release.yml for every push to main so a release can wait for it.
 on:
-  push:
-    branches:
-      - main
   pull_request:
+  workflow_call:
 
 jobs:
   pint:

@@ -4,6 +4,8 @@
     "author": "dylf",
     "version": "0.1.0",
     "description": "Lazy server management for Pelican: automatically stop game servers after they have had no players for a configurable time",
+    "url": "https://github.com/dylf/lazy-pelican",
+    "update_url": "https://github.com/dylf/lazy-pelican/releases/latest/download/update.json",
     "category": "plugin",
     "namespace": "Dylf\\LazyPelican",
     "class": "LazyPelicanPlugin",

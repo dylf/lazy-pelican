@@ -1,0 +1,73 @@
+name: Release
+
+# On every push to main, CI runs first. Only if it passes does release-please run: it keeps a "release" pull
+# request up to date (version bump in plugin.json, changelog) from conventional commit messages. Merging that PR
+# creates the tag and GitHub Release (again only after CI passes), and the last job attaches the plugin zip and
+# update.json to it.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  release-please:
+    name: Release PR
+    needs: ci
+    runs-on: ubuntu-latest
+
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+
+    steps:
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  assets:
+    name: Attach plugin zip
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Build the plugin zip
+        run: |
+          ID="$(jq -r .id plugin.json)"
+          # The folder inside the zip must match the plugin id. Dev-only files are excluded via .gitattributes.
+          git archive --format=zip --prefix="$ID/" -o "$ID.zip" HEAD
+          echo "ID=$ID" >> "$GITHUB_ENV"
+
+      - name: Write update.json
+        env:
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          SHA256="$(sha256sum "$ID.zip" | cut -d' ' -f1)"
+          jq -n \
+            --arg version "${TAG#v}" \
+            --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${ID}.zip" \
+            --arg sha256 "$SHA256" \
+            '{"*": {version: $version, download_url: $url, sha256: $sha256}}' > update.json
+          cat update.json
+
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: gh release upload "$TAG" "$ID.zip" update.json --clobber
