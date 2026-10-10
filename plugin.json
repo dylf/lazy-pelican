@@ -1,0 +1,16 @@
+{
+    "id": "lazy-pelican",
+    "name": "Lazy Pelican",
+    "author": "dylf",
+    "version": "0.1.0",
+    "description": "Lazy server management for Pelican: automatically stop game servers after they have had no players for a configurable time",
+    "category": "plugin",
+    "namespace": "Dylf\\LazyPelican",
+    "class": "LazyPelicanPlugin",
+    "panels": [
+        "server"
+    ],
+    "panel_version": null,
+    "api_version": 1,
+    "composer_packages": null
+}
