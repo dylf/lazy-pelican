@@ -39,3 +39,15 @@ Test by hand: `php artisan lazy-pelican:check -v`
 ## License
 
 MIT, see [LICENSE](LICENSE).
+
+## Development
+
+CI follows the official `pelican/plugins` setup (Pint and PHPStan against a checkout of the panel), plus a small PHPUnit suite.
+
+```bash
+composer install
+vendor/bin/pint --test     # code style
+vendor/bin/phpunit         # structure checks (no panel needed)
+```
+
+PHPStan only runs in CI, because it analyses against the panel's classes.

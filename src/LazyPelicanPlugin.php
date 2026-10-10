@@ -4,9 +4,9 @@ namespace Dylf\LazyPelican;
 
 use App\Contracts\Plugins\HasPluginSettings;
 use App\Traits\EnvironmentWriterTrait;
+use Dylf\LazyPelican\Services\IdleShutdownService;
 use Filament\Contracts\Plugin;
 use Filament\Forms\Components\TextInput;
-use Dylf\LazyPelican\Services\IdleShutdownService;
 use Filament\Notifications\Notification;
 use Filament\Panel;
 use Filament\Schemas\Components\Text;

@@ -1,0 +1,19 @@
+{
+    "name": "dylf/lazy-pelican",
+    "description": "Lazy server management for the Pelican panel",
+    "type": "project",
+    "license": "MIT",
+    "require-dev": {
+        "phpunit/phpunit": "^12.0",
+        "laravel/pint": "^1.29"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Dylf\\LazyPelican\\": "src/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "lint": "pint --test"
+    }
+}

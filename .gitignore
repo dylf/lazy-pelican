@@ -1,5 +1,8 @@
 # Build artifacts
 *.zip
+.phpunit.cache/
+.phpunit.result.cache
+composer.lock
 
 # Dependencies (installed by the panel, not part of the plugin)
 /vendor/

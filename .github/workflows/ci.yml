@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  pint:
+    name: Pint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.5
+          tools: composer:v2
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Run Pint
+        run: vendor/bin/pint --test
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: true
+      matrix:
+        php: [ 8.4, 8.5 ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Run tests
+        run: vendor/bin/phpunit
+
+  phpstan:
+    name: PHPStan
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: true
+      matrix:
+        php: [ 8.4, 8.5 ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Clone Pelican Panel
+        run: git clone --depth=1 https://github.com/pelican/panel pelican
+
+      # lazy-pelican uses the Player Counter plugin's classes, so analyse against it too
+      - name: Clone official plugins
+        run: git clone --depth=1 https://github.com/pelican/plugins official-plugins
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          coverage: none
+
+      - name: Install panel dependencies
+        run: |
+          cd pelican
+          composer install --no-interaction --no-suggest --no-progress --no-scripts
+
+      - name: Install plugin dependencies
+        run: |
+          cd pelican
+          composer require "xpaw/php-minecraft-query:^5.0.0" "xpaw/php-source-query-class:^6.0.0"
+
+      - name: Setup .env file
+        run: cp pelican/.env.example pelican/.env
+
+      - name: Move plugin folders and phpstan.neon
+        run: |
+          mkdir -p pelican/plugins/lazy-pelican
+          rsync -av ./ pelican/plugins/lazy-pelican/ --exclude=pelican --exclude=official-plugins --exclude=.git --exclude=vendor
+          cp -r official-plugins/player-counter pelican/plugins/player-counter
+          cp phpstan.neon pelican/phpstan.neon
+
+      - name: Run PHPStan Analysis
+        run: |
+          cd pelican
+          vendor/bin/phpstan analyse --memory-limit=-1 --error-format=github
