@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -150,6 +151,101 @@ func (c *Client) Details(ctx context.Context, id string) (Details, error) {
 // Ping checks the key is accepted at all.
 func (c *Client) Ping(ctx context.Context) error {
 	_, err := c.do(ctx, http.MethodGet, "/api/client", nil, nil)
+
+	return err
+}
+
+// ErrNotSupported means the panel answered 404 for a Lazy Pelican endpoint: the plugin is missing or too old.
+var ErrNotSupported = errors.New("the panel doesn't have the Lazy Pelican agent API (plugin missing, disabled or too old)")
+
+// RemoteConfig is what the panel's Lazy Pelican plugin tells the agent to do.
+type RemoteConfig struct {
+	APIVersion int `json:"api_version"`
+	Detector   struct {
+		Packets        int `json:"packets"`
+		WindowSeconds  int `json:"window_seconds"`
+		HoldoffSeconds int `json:"holdoff_seconds"`
+	} `json:"detector"`
+	Limits struct {
+		CooldownSeconds int `json:"cooldown_seconds"`
+		MaxWakesPerHour int `json:"max_wakes_per_hour"`
+	} `json:"limits"`
+	Servers []RemoteServer `json:"servers"`
+}
+
+type RemoteServer struct {
+	Identifier string   `json:"identifier"`
+	Name       string   `json:"name"`
+	Node       string   `json:"node"`
+	Ports      []uint16 `json:"ports"`
+	Match      struct {
+		Prefix string `json:"prefix"`
+		Length int    `json:"length"`
+	} `json:"match"`
+}
+
+// Config fetches the servers to watch and the detector settings. node narrows it to one node (id, name or FQDN).
+func (c *Client) Config(ctx context.Context, node string) (*RemoteConfig, error) {
+	path := "/api/client/lazy-pelican/agent/config"
+	if node != "" {
+		path += "?node=" + url.QueryEscape(node)
+	}
+
+	var out RemoteConfig
+
+	status, err := c.do(ctx, http.MethodGet, path, nil, &out)
+	if status == http.StatusNotFound {
+		return nil, ErrNotSupported
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &out, nil
+}
+
+// ServerReport is one watched server in a heartbeat.
+type ServerReport struct {
+	Identifier      string     `json:"identifier"`
+	LastDetectionAt *time.Time `json:"last_detection_at"`
+	LastWakeAt      *time.Time `json:"last_wake_at"`
+}
+
+type CaptureReport struct {
+	OK    bool    `json:"ok"`
+	Error *string `json:"error"`
+}
+
+type Heartbeat struct {
+	AgentVersion string         `json:"agent_version"`
+	Hostname     string         `json:"hostname"`
+	Node         string         `json:"node,omitempty"`
+	Interface    string         `json:"interface"`
+	Capture      CaptureReport  `json:"capture"`
+	Servers      []ServerReport `json:"servers"`
+}
+
+// SendHeartbeat tells the panel the agent is alive, and how capture is going.
+func (c *Client) SendHeartbeat(ctx context.Context, hb Heartbeat) error {
+	if hb.Servers == nil {
+		hb.Servers = []ServerReport{}
+	}
+
+	status, err := c.do(ctx, http.MethodPost, "/api/client/lazy-pelican/agent/heartbeat", hb, nil)
+	if status == http.StatusNotFound {
+		return ErrNotSupported
+	}
+
+	return err
+}
+
+// ReportWake records in the panel's activity log that the agent started a server for a joining player.
+func (c *Client) ReportWake(ctx context.Context, identifier string, at time.Time) error {
+	body := map[string]string{"identifier": identifier, "at": at.UTC().Format(time.RFC3339)}
+
+	// A 404 here can legitimately mean "no such server with wake on connect enabled", so it isn't ErrNotSupported.
+	_, err := c.do(ctx, http.MethodPost, "/api/client/lazy-pelican/agent/wake", body, nil)
 
 	return err
 }

@@ -96,10 +96,10 @@ jobs:
           VERSION="${TAG#v}"
           mkdir -p dist
           for ARCH in amd64 arm64; do
-            NAME="lazy-agent_${VERSION}_linux_${ARCH}"
+            NAME="lazy-pelican-agent_${VERSION}_linux_${ARCH}"
             mkdir -p "dist/$NAME"
             (cd agent && CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build -trimpath \
-              -ldflags="-s -w -X main.version=${VERSION}" -o "../dist/$NAME/lazy-agent" ./cmd/lazy-agent)
+              -ldflags="-s -w -X main.version=${VERSION}" -o "../dist/$NAME/lazy-pelican-agent" ./cmd/lazy-pelican-agent)
             cp agent/README.md agent/deploy/* "dist/$NAME/"
             tar -C dist -czf "dist/$NAME.tar.gz" "$NAME"
           done

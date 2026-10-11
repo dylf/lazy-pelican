@@ -38,21 +38,25 @@ class LazyPelicanPlugin implements HasPluginSettings, Plugin
     {
         $available = IdleShutdownService::playerCounterAvailable();
 
+        $number = fn (string $key, int $min, $label, $help) => TextInput::make($key)
+            ->label($label)
+            ->helperText($help)
+            ->numeric()
+            ->minValue($min)
+            ->required()
+            ->default(fn () => config('lazy-pelican.' . $key));
+
         return [
             Text::make(trans($available ? 'lazy-pelican::messages.player_counter_ok_admin' : 'lazy-pelican::messages.needs_player_counter_admin'))
                 ->color($available ? 'success' : 'danger'),
-            TextInput::make('default_idle_minutes')
-                ->label(trans('lazy-pelican::messages.default_idle_minutes'))
-                ->numeric()
-                ->minValue(1)
-                ->required()
-                ->default(fn () => config('lazy-pelican.default_idle_minutes')),
-            TextInput::make('default_grace_minutes')
-                ->label(trans('lazy-pelican::messages.default_grace_minutes'))
-                ->numeric()
-                ->minValue(0)
-                ->required()
-                ->default(fn () => config('lazy-pelican.default_grace_minutes')),
+            $number('default_idle_minutes', 1, trans('lazy-pelican::messages.default_idle_minutes'), trans('lazy-pelican::messages.default_idle_minutes_help')),
+            $number('default_grace_minutes', 0, trans('lazy-pelican::messages.default_grace_minutes'), trans('lazy-pelican::messages.default_grace_minutes_help')),
+            Text::make(trans('lazy-pelican::messages.agent_refresh_note')),
+            $number('detector_packets', 1, trans('lazy-pelican::messages.detector_packets'), trans('lazy-pelican::messages.detector_packets_help')),
+            $number('detector_window', 1, trans('lazy-pelican::messages.detector_window'), trans('lazy-pelican::messages.detector_window_help')),
+            $number('detector_holdoff', 0, trans('lazy-pelican::messages.detector_holdoff'), trans('lazy-pelican::messages.detector_holdoff_help')),
+            $number('wake_cooldown', 0, trans('lazy-pelican::messages.wake_cooldown'), trans('lazy-pelican::messages.wake_cooldown_help')),
+            $number('wake_max_per_hour', 1, trans('lazy-pelican::messages.wake_max_per_hour'), trans('lazy-pelican::messages.wake_max_per_hour_help')),
         ];
     }
 
@@ -61,6 +65,11 @@ class LazyPelicanPlugin implements HasPluginSettings, Plugin
         $this->writeToEnvironment([
             'LAZY_PELICAN_DEFAULT_IDLE_MINUTES' => $data['default_idle_minutes'],
             'LAZY_PELICAN_DEFAULT_GRACE_MINUTES' => $data['default_grace_minutes'],
+            'LAZY_PELICAN_DETECTOR_PACKETS' => $data['detector_packets'],
+            'LAZY_PELICAN_DETECTOR_WINDOW' => $data['detector_window'],
+            'LAZY_PELICAN_DETECTOR_HOLDOFF' => $data['detector_holdoff'],
+            'LAZY_PELICAN_WAKE_COOLDOWN' => $data['wake_cooldown'],
+            'LAZY_PELICAN_WAKE_MAX_PER_HOUR' => $data['wake_max_per_hour'],
         ]);
 
         Notification::make()

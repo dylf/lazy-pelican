@@ -3,11 +3,13 @@ package panel
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func server(t *testing.T, h http.HandlerFunc) *Client {
@@ -21,7 +23,7 @@ func server(t *testing.T, h http.HandlerFunc) *Client {
 
 func TestStateSendsTheKeyAndReadsTheState(t *testing.T) {
 	c := server(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "GET" || r.URL.Path != "/api/client/servers/60455931/resources" {
+		if r.Method != "GET" || r.URL.Path != "/api/client/servers/1a2b3c4d/resources" {
 			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 
@@ -32,7 +34,7 @@ func TestStateSendsTheKeyAndReadsTheState(t *testing.T) {
 		io.WriteString(w, `{"object":"stats","attributes":{"current_state":"offline","is_suspended":false,"resources":{}}}`)
 	})
 
-	got, err := c.State(context.Background(), "60455931")
+	got, err := c.State(context.Background(), "1a2b3c4d")
 	if err != nil || got != "offline" {
 		t.Fatalf("got %q %v", got, err)
 	}
@@ -155,5 +157,144 @@ func TestPing(t *testing.T) {
 
 	if err := server(t, func(w http.ResponseWriter, r *http.Request) { http.Error(w, "x", 401) }).Ping(context.Background()); err == nil {
 		t.Fatal("expected an error for a rejected key")
+	}
+}
+
+func TestConfigFetchesAndParses(t *testing.T) {
+	c := server(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" || r.URL.Path != "/api/client/lazy-pelican/agent/config" || r.URL.Query().Get("node") != "my node" {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+
+		io.WriteString(w, `{"api_version":1,"detector":{"packets":3,"window_seconds":5,"holdoff_seconds":30},"limits":{"cooldown_seconds":300,"max_wakes_per_hour":6},
+			"servers":[{"identifier":"5e6f7a8b","name":"Valheim","node":"node","ports":[27000],"match":{"prefix":"2010000d","length":512}}]}`)
+	})
+
+	cfg, err := c.Config(context.Background(), "my node")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cfg.Detector.Packets != 3 || cfg.Limits.MaxWakesPerHour != 6 || len(cfg.Servers) != 1 || cfg.Servers[0].Ports[0] != 27000 || cfg.Servers[0].Match.Length != 512 {
+		t.Fatalf("%+v", cfg)
+	}
+}
+
+func TestConfigWithoutANodeSendsNoQuery(t *testing.T) {
+	c := server(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RawQuery != "" {
+			t.Errorf("unexpected query %q", r.URL.RawQuery)
+		}
+
+		io.WriteString(w, `{"api_version":1,"servers":[]}`)
+	})
+
+	if _, err := c.Config(context.Background(), ""); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestConfigAndHeartbeat404MeansTheRouteIsMissing(t *testing.T) {
+	c := server(t, func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) })
+
+	if _, err := c.Config(context.Background(), ""); !errors.Is(err, ErrNotSupported) {
+		t.Errorf("config: %v", err)
+	}
+
+	if err := c.SendHeartbeat(context.Background(), Heartbeat{}); !errors.Is(err, ErrNotSupported) {
+		t.Errorf("heartbeat: %v", err)
+	}
+}
+
+func TestConfigOtherErrorsAreNotMistakenForAMissingPlugin(t *testing.T) {
+	c := server(t, func(w http.ResponseWriter, r *http.Request) { http.Error(w, "nope", 403) })
+
+	_, err := c.Config(context.Background(), "")
+	if err == nil || errors.Is(err, ErrNotSupported) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestSendHeartbeatBody(t *testing.T) {
+	var got map[string]any
+
+	c := server(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/api/client/lazy-pelican/agent/heartbeat" {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+
+		json.NewDecoder(r.Body).Decode(&got)
+		w.WriteHeader(204)
+	})
+
+	msg := "operation not permitted"
+	at := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	err := c.SendHeartbeat(context.Background(), Heartbeat{
+		AgentVersion: "1.2.3", Hostname: "gameserver", Node: "node", Interface: "any",
+		Capture: CaptureReport{OK: false, Error: &msg},
+		Servers: []ServerReport{{Identifier: "abc123", LastDetectionAt: &at}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	capture := got["capture"].(map[string]any)
+	servers := got["servers"].([]any)
+	first := servers[0].(map[string]any)
+
+	if got["agent_version"] != "1.2.3" || got["hostname"] != "gameserver" || got["node"] != "node" || capture["ok"] != false || capture["error"] != msg ||
+		first["identifier"] != "abc123" || first["last_detection_at"] != "2026-01-01T12:00:00Z" || first["last_wake_at"] != nil {
+		t.Fatalf("unexpected body: %v", got)
+	}
+}
+
+func TestSendHeartbeatWithNoServersSendsAnEmptyList(t *testing.T) {
+	var raw string
+
+	c := server(t, func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		raw = string(b)
+		w.WriteHeader(204)
+	})
+
+	if err := c.SendHeartbeat(context.Background(), Heartbeat{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(raw, `"servers":[]`) {
+		t.Fatalf("the panel validates servers as an array, so null is wrong: %s", raw)
+	}
+}
+
+func TestReportWake(t *testing.T) {
+	var got map[string]string
+
+	c := server(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/api/client/lazy-pelican/agent/wake" {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+
+		json.NewDecoder(r.Body).Decode(&got)
+		w.WriteHeader(204)
+	})
+
+	at := time.Date(2026, 1, 1, 12, 0, 0, 0, time.FixedZone("x", 3600))
+
+	if err := c.ReportWake(context.Background(), "abc123", at); err != nil {
+		t.Fatal(err)
+	}
+
+	if got["identifier"] != "abc123" || got["at"] != "2026-01-01T11:00:00Z" {
+		t.Fatalf("%v", got)
+	}
+}
+
+func TestReportWake404IsNotAMissingPlugin(t *testing.T) {
+	c := server(t, func(w http.ResponseWriter, r *http.Request) { http.Error(w, "No such server", 404) })
+
+	err := c.ReportWake(context.Background(), "abc123", time.Now())
+	if err == nil || errors.Is(err, ErrNotSupported) {
+		t.Fatalf("got %v", err)
 	}
 }

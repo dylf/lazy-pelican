@@ -13,8 +13,8 @@ class LazyPelicanPluginProvider extends ServiceProvider
     {
         $this->app->singleton(IdleShutdownService::class);
 
-        // Lets owners grant subusers the right to change idle shutdown settings.
-        Subuser::registerCustomPermissions('idle_shutdown', ['update'], 'lazy-pelican::permissions', 'tabler-moon');
+        // Lets owners grant subusers the right to change the Lazy Pelican settings (idle shutdown and wake on connect).
+        Subuser::registerCustomPermissions('lazy_pelican', ['update'], 'lazy-pelican::permissions', 'tabler-moon');
     }
 
     public function boot(): void

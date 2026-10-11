@@ -15,6 +15,7 @@ import (
 type Config struct {
 	PanelURL      string   `yaml:"panel_url"`
 	APIKey        string   `yaml:"api_key"`
+	Node          string   `yaml:"node"` // id, name or FQDN of the node this agent runs on; empty = any
 	Interface     string   `yaml:"interface"`
 	IgnoreSources []string `yaml:"ignore_sources"`
 
@@ -23,6 +24,7 @@ type Config struct {
 	Servers  []Server `yaml:"servers"`
 }
 
+// Detector and Limits are overrides: zero means "use the panel's value" (see agent.Resolve).
 type Detector struct {
 	Packets int           `yaml:"packets"`
 	Window  time.Duration `yaml:"window"`
@@ -48,7 +50,7 @@ type Match struct {
 }
 
 // APIKeyEnv overrides api_key so the secret can stay out of the file.
-const APIKeyEnv = "LAZY_AGENT_API_KEY"
+const APIKeyEnv = "LAZY_PELICAN_API_KEY"
 
 func Load(path string) (*Config, error) {
 	raw, err := os.ReadFile(path)
@@ -84,26 +86,6 @@ func (c *Config) applyDefaults() {
 	if c.Interface == "" {
 		c.Interface = "any"
 	}
-
-	if c.Detector.Packets == 0 {
-		c.Detector.Packets = 3
-	}
-
-	if c.Detector.Window == 0 {
-		c.Detector.Window = 5 * time.Second
-	}
-
-	if c.Detector.Holdoff == 0 {
-		c.Detector.Holdoff = 30 * time.Second
-	}
-
-	if c.Limits.Cooldown == 0 {
-		c.Limits.Cooldown = 5 * time.Minute
-	}
-
-	if c.Limits.MaxWakesPerHour == 0 {
-		c.Limits.MaxWakesPerHour = 6
-	}
 }
 
 func (c *Config) Validate() error {
@@ -113,10 +95,6 @@ func (c *Config) Validate() error {
 
 	if c.APIKey == "" {
 		return fmt.Errorf("no API key: set api_key or the %s environment variable", APIKeyEnv)
-	}
-
-	if len(c.Servers) == 0 {
-		return fmt.Errorf("no servers configured")
 	}
 
 	seenName, seenPort := map[string]bool{}, map[uint16]string{}
@@ -155,12 +133,12 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.Detector.Packets < 1 || c.Detector.Window <= 0 || c.Detector.Holdoff < 0 {
-		return fmt.Errorf("detector: packets must be >= 1, window > 0, holdoff >= 0")
+	if c.Detector.Packets < 0 || c.Detector.Window < 0 || c.Detector.Holdoff < 0 {
+		return fmt.Errorf("detector: values cannot be negative")
 	}
 
-	if c.Limits.Cooldown < 0 || c.Limits.MaxWakesPerHour < 1 {
-		return fmt.Errorf("limits: cooldown must be >= 0 and max_wakes_per_hour >= 1")
+	if c.Limits.Cooldown < 0 || c.Limits.MaxWakesPerHour < 0 {
+		return fmt.Errorf("limits: values cannot be negative")
 	}
 
 	if _, err := c.IgnorePrefixes(); err != nil {
@@ -199,5 +177,10 @@ func (c *Config) Redacted() string {
 		key = "(set)"
 	}
 
-	return fmt.Sprintf("panel=%s key=%s interface=%s servers=%d", c.PanelURL, key, c.Interface, len(c.Servers))
+	servers := "from the panel"
+	if len(c.Servers) > 0 {
+		servers = fmt.Sprintf("%d from this file", len(c.Servers))
+	}
+
+	return fmt.Sprintf("panel=%s key=%s node=%q interface=%s servers=%s", c.PanelURL, key, c.Node, c.Interface, servers)
 }

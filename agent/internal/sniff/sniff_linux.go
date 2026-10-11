@@ -62,20 +62,20 @@ func Check(iface string) error {
 	return syscall.Close(fd)
 }
 
-// Run reads inbound IPv4/UDP packets destined for any of ports and sends them on out until ctx is cancelled.
+// Run reads inbound IPv4/UDP packets destined for any of the ports in the set and sends them on out until ctx is
+// cancelled. ready, if given, is called once the capture socket is open.
 //
 // Filtering happens in userspace, so every inbound IPv4 packet on the interface is copied to the agent. That is
 // fine for a game host, but a BPF filter would be cheaper on a busy one.
-func Run(ctx context.Context, iface string, ports []uint16, out chan<- detector.Packet) error {
+func Run(ctx context.Context, iface string, ports *PortSet, out chan<- detector.Packet, ready func()) error {
 	fd, err := open(iface)
 	if err != nil {
 		return err
 	}
 	defer syscall.Close(fd)
 
-	watch := make(map[uint16]bool, len(ports))
-	for _, p := range ports {
-		watch[p] = true
+	if ready != nil {
+		ready()
 	}
 
 	buf := make([]byte, 65536)
@@ -95,7 +95,7 @@ func Run(ctx context.Context, iface string, ports []uint16, out chan<- detector.
 		}
 
 		d, err := DecodeIPv4UDP(buf[:n])
-		if err != nil || !watch[d.DstPort] {
+		if err != nil || !ports.Has(d.DstPort) {
 			continue
 		}
 

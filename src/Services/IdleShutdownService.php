@@ -7,7 +7,7 @@ use App\Models\Server;
 use App\Repositories\Daemon\DaemonServerRepository;
 use Boy132\PlayerCounter\Extensions\Query\QueryTypeService;
 use Boy132\PlayerCounter\Models\GameQuery;
-use Dylf\LazyPelican\Models\IdleShutdownSetting;
+use Dylf\LazyPelican\Models\LazyPelicanServer;
 use Exception;
 use Illuminate\Support\Facades\Log;
 
@@ -25,7 +25,7 @@ class IdleShutdownService
         $results = [];
 
         if (!static::playerCounterAvailable()) {
-            $count = IdleShutdownSetting::query()->where('enabled', true)->count();
+            $count = LazyPelicanServer::query()->where('enabled', true)->count();
 
             if ($count > 0) {
                 Log::warning(trans('lazy-pelican::messages.player_counter_missing_log', ['count' => $count]));
@@ -34,10 +34,10 @@ class IdleShutdownService
             return $results;
         }
 
-        IdleShutdownSetting::query()
+        LazyPelicanServer::query()
             ->where('enabled', true)
             ->with('server')
-            ->each(function (IdleShutdownSetting $setting) use (&$results) {
+            ->each(function (LazyPelicanServer $setting) use (&$results) {
                 try {
                     $results[$setting->server_id] = $this->check($setting);
                 } catch (Exception $exception) {
@@ -54,7 +54,7 @@ class IdleShutdownService
      * Decide what to do with a single server. Fails safe: anything uncertain resets
      * the idle timer and never stops the server.
      */
-    public function check(IdleShutdownSetting $setting): string
+    public function check(LazyPelicanServer $setting): string
     {
         $server = $setting->server;
 
@@ -151,7 +151,7 @@ class IdleShutdownService
         return (int) $data['current_players'];
     }
 
-    protected function stop(IdleShutdownSetting $setting, Server $server, int $emptyFor): string
+    protected function stop(LazyPelicanServer $setting, Server $server, int $emptyFor): string
     {
         $this->daemonServerRepository->setServer($server)->power('stop')->throw();
 

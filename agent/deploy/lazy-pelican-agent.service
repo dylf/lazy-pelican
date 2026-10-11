@@ -1,12 +1,12 @@
 [Unit]
-Description=lazy-agent: start Pelican game servers when players try to join
+Description=lazy-pelican-agent: start Pelican game servers when players try to join
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/lazy-agent run -config /etc/lazy-agent/config.yml
-# Holds LAZY_AGENT_API_KEY=... (chmod 600, root-owned; systemd reads it before dropping privileges)
-EnvironmentFile=/etc/lazy-agent/env
+ExecStart=/usr/local/bin/lazy-pelican-agent run -config /etc/lazy-pelican-agent/config.yml
+# Holds LAZY_PELICAN_API_KEY=... (chmod 600, root-owned; systemd reads it before dropping privileges)
+EnvironmentFile=/etc/lazy-pelican-agent/env
 Restart=on-failure
 RestartSec=5s
 

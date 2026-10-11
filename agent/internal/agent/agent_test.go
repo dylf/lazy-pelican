@@ -220,27 +220,155 @@ func TestUnknownServer(t *testing.T) {
 	}
 }
 
-func TestWatchEndToEnd(t *testing.T) {
-	p := &fakePanel{state: "offline"}
-	a, _ := setup(p)
+func joinBurst(src string, port uint16, n int) chan detector.Packet {
+	packets := make(chan detector.Packet, n)
+	start := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	for i := 0; i < n; i++ {
+		packets <- detector.Packet{At: start.Add(time.Duration(i) * time.Second), Src: netip.MustParseAddr(src), DstPort: port, Length: 1, Payload: []byte{1}}
+	}
+
+	close(packets)
+
+	return packets
+}
+
+func oneServerUpdate(t *testing.T) Update {
+	t.Helper()
 
 	d, err := detector.New([]detector.Target{{Name: "valheim", Ports: []uint16{27000}, Rule: detector.Rule{Packets: 3, Window: 5 * time.Second, Holdoff: 30 * time.Second}}})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	packets := make(chan detector.Packet, 8)
-	start := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
-	src := netip.MustParseAddr("198.51.100.9")
+	return Update{Detector: d, Servers: []Server{{Name: "valheim", ID: "abc123"}}, Cooldown: 5 * time.Minute, MaxWakesPerHour: 3}
+}
 
-	for i := 0; i < 3; i++ {
-		packets <- detector.Packet{At: start.Add(time.Duration(i) * time.Second), Src: src, DstPort: 27000, Length: 1, Payload: []byte{1}}
-	}
-	close(packets)
+func TestWatchEndToEnd(t *testing.T) {
+	p := &fakePanel{state: "offline"}
+	a, _ := setup(p)
 
-	Watch(context.Background(), d, packets, a) // returns once the channel is drained
+	updates := make(chan Update, 1)
+	updates <- oneServerUpdate(t)
+
+	Watch(context.Background(), joinBurst("198.51.100.9", 27000, 3), updates, a) // returns once the channel is drained
 
 	if _, starts := p.counts(); starts != 1 {
 		t.Fatalf("expected the join attempt to start the server once, got %d", starts)
+	}
+}
+
+func TestWatchIgnoresPacketsUntilItHasAPlan(t *testing.T) {
+	p := &fakePanel{state: "offline"}
+	a, _ := setup(p)
+
+	Watch(context.Background(), joinBurst("198.51.100.9", 27000, 10), make(chan Update), a)
+
+	if states, starts := p.counts(); states != 0 || starts != 0 {
+		t.Fatalf("acted before it had a plan: states=%d starts=%d", states, starts)
+	}
+}
+
+func TestWatchSwitchesToANewPlan(t *testing.T) {
+	p := &fakePanel{state: "offline"}
+	a, _ := setup(p, func(o *Options) { o.Servers = nil })
+
+	updates := make(chan Update, 2)
+	updates <- oneServerUpdate(t)
+
+	// a second plan that no longer watches the server: traffic must stop mattering
+	empty, _ := detector.New(nil)
+	updates <- Update{Detector: empty}
+
+	Watch(context.Background(), joinBurst("198.51.100.9", 27000, 5), updates, a)
+
+	if _, starts := p.counts(); starts != 0 {
+		t.Fatalf("a removed server was still woken: %d starts", starts)
+	}
+}
+
+func TestSetPlanKeepsRunningCooldowns(t *testing.T) {
+	p := &fakePanel{state: "offline"}
+	a, c := setup(p)
+
+	a.Handle(context.Background(), "valheim") // starts it, cooldown begins
+
+	a.SetPlan([]Server{{Name: "valheim", ID: "abc123"}}, 5*time.Minute, 3) // e.g. a config refresh
+	c.advance(time.Minute)
+
+	if got := a.Handle(context.Background(), "valheim"); got != Quiet {
+		t.Fatalf("a config refresh reset the cooldown: got %s", got)
+	}
+}
+
+func TestSetPlanAppliesNewLimits(t *testing.T) {
+	p := &fakePanel{state: "offline"}
+	a, c := setup(p)
+
+	a.SetPlan([]Server{{Name: "valheim", ID: "abc123"}}, time.Minute, 1)
+
+	a.Handle(context.Background(), "valheim")
+	c.advance(2 * time.Minute)
+
+	if got := a.Handle(context.Background(), "valheim"); got != RateLimited {
+		t.Fatalf("got %s, want rate-limited under the new cap of 1", got)
+	}
+}
+
+func TestOnWakeIsCalledOnlyForRealStarts(t *testing.T) {
+	woke := make(chan Server, 4)
+
+	p := &fakePanel{state: "offline"}
+	a, _ := setup(p, func(o *Options) { o.OnWake = func(s Server, _ time.Time) { woke <- s } })
+
+	a.Handle(context.Background(), "valheim")
+
+	select {
+	case s := <-woke:
+		if s.ID != "abc123" {
+			t.Fatalf("woke %+v", s)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("OnWake was not called after a start")
+	}
+
+	for name, mod := range map[string]func(*Options){"dry run": func(o *Options) { o.DryRun = true }} {
+		p2 := &fakePanel{state: "offline"}
+		b, _ := setup(p2, mod, func(o *Options) { o.OnWake = func(s Server, _ time.Time) { woke <- s } })
+		b.Handle(context.Background(), "valheim")
+
+		select {
+		case <-woke:
+			t.Fatalf("%s: OnWake was called without a start", name)
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+
+	p3 := &fakePanel{state: "running"}
+	c, _ := setup(p3, func(o *Options) { o.OnWake = func(s Server, _ time.Time) { woke <- s } })
+	c.Handle(context.Background(), "valheim")
+
+	select {
+	case <-woke:
+		t.Fatal("OnWake was called for a server that was already running")
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestStatsTracksDetectionsAndWakes(t *testing.T) {
+	p := &fakePanel{state: "offline"}
+	a, c := setup(p)
+
+	if s := a.Stats(); len(s) != 1 || !s[0].LastDetection.IsZero() || !s[0].LastWake.IsZero() {
+		t.Fatalf("fresh stats %+v", s)
+	}
+
+	at := c.now().Add(-time.Minute)
+	a.NoteDetection("valheim", at)
+	a.Handle(context.Background(), "valheim")
+
+	s := a.Stats()
+	if !s[0].LastDetection.Equal(at) || !s[0].LastWake.Equal(c.now()) {
+		t.Fatalf("stats %+v", s)
 	}
 }

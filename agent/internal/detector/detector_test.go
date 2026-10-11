@@ -131,11 +131,11 @@ func TestIsQuery(t *testing.T) {
 }
 
 func TestIgnoredSourcesNeverCount(t *testing.T) {
-	d := mustNew(t, target(func(t *Target) { t.Ignore = []netip.Prefix{netip.MustParsePrefix("10.0.0.112/32")} }))
+	d := mustNew(t, target(func(t *Target) { t.Ignore = []netip.Prefix{netip.MustParsePrefix("10.0.0.50/32")} }))
 
 	var packets []Packet
 	for i := 0; i < 10; i++ {
-		packets = append(packets, pkt(time.Duration(i)*100*time.Millisecond, "10.0.0.112", 27000, []byte{1}))
+		packets = append(packets, pkt(time.Duration(i)*100*time.Millisecond, "10.0.0.50", 27000, []byte{1}))
 	}
 
 	if fires(d, packets...) != 0 {

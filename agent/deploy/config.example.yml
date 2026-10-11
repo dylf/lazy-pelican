@@ -1,35 +1,40 @@
-# lazy-agent configuration. The API key is better kept out of this file: set LAZY_AGENT_API_KEY instead.
+# lazy-pelican-agent configuration.
+#
+# Which servers to watch, on which ports, and the detection thresholds all come from the panel (Wake on connect, on each
+# server's Lazy Pelican page; thresholds in the plugin's settings). This file only says how to reach the panel.
+#
+# Keep the API key out of this file: set LAZY_PELICAN_API_KEY instead. It is the account (client) key of a user that has
+# only the Start permission on the servers (starts with pacc_), not an admin "Application" key.
 panel_url: https://panel.example.com
 # api_key: pacc_...
+
+# The node this agent runs on (id, name or FQDN). Needed once you have more than one Wings host, so an agent never
+# watches ports for servers on another host. Leave it out if you only have one node.
+node: node
+
+# Never count traffic from these addresses. The panel's own address is added automatically, but if the panel reaches
+# this host from a LAN address (its public DNS name resolves elsewhere), add that here.
+# ignore_sources: [10.0.0.50]
 
 # Network interface to watch. "any" (the default) works for both bare-metal and Docker Wings.
 # interface: any
 
-# Never count traffic from these addresses. The panel's own address is added automatically.
-# ignore_sources: [10.0.0.50, 192.168.1.0/24]
+# ---- Optional local overrides. Anything set here wins over the panel. ----------------------------------------------
 
-# When does a burst of packets count as a player trying to join?
 # detector:
 #   packets: 3       # this many non-query UDP packets...
 #   window: 5s       # ...from one source within this long
 #   holdoff: 30s     # then ignore the server for this long
-
-# Safety limits per server.
+#
 # limits:
 #   cooldown: 5m          # after starting a server, ignore join attempts for this long
 #   max_wakes_per_hour: 6 # stops a scanner from making a server start over and over
 
-servers:
-  # `id` is the short identifier in the server's URL: https://panel/server/<id>/console
-  # `ports` are the server's game port(s) as the players see them (the allocation ports).
-  - name: palworld
-    id: 60455931
-    ports: [27002]
-
-  - name: valheim
-    id: dc93fa79
-    ports: [27000]          # the game port, NOT the query port (27001)
-    # Optional: only count packets that look like the game's own join traffic.
-    # match:
-    #   prefix: "2010000d"  # hex, no spaces
-    #   length: 512
+# Listing servers here REPLACES the panel's list completely (the panel is then not asked which servers to watch).
+# servers:
+#   - name: valheim
+#     id: 5e6f7a8b            # the short identifier in https://panel/server/<id>/console
+#     ports: [27000]          # the game port, NOT the query port
+#     match:                  # optional: only count packets that look like the game's own join traffic
+#       prefix: "2010000d"    # hex, no spaces
+#       length: 512
