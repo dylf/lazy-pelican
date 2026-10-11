@@ -84,6 +84,28 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /dev/null ./cmd/lazy-agent
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /dev/null ./cmd/lazy-agent
 
+  agent-image:
+    name: Agent image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Builds the image (not pushed) so a broken Dockerfile is caught before a release, then runs it once.
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: agent
+          load: true
+          push: false
+          tags: lazy-pelican-agent:ci
+
+      - name: Smoke test
+        run: docker run --rm lazy-pelican-agent:ci version
+
   phpstan:
     name: PHPStan
     runs-on: ubuntu-latest

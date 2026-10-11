@@ -55,7 +55,13 @@ The unit runs as a throwaway user with only `CAP_NET_RAW`.
 ### Docker
 
 See `deploy/docker-compose.example.yml`. It needs `network_mode: host` and `cap_add: [NET_RAW]`, nothing else.
-Build with `docker build -t lazy-pelican-agent agent/`.
+Releases publish `ghcr.io/dylf/lazy-pelican-agent` (amd64 and arm64); to build it yourself, run
+`docker build -t lazy-pelican-agent agent/`.
+
+### Releases
+
+Each release attaches `lazy-agent_<version>_linux_<amd64|arm64>.tar.gz` (the binary plus the example config, systemd
+unit and compose file) and `SHA256SUMS`. Check a download with `sha256sum -c SHA256SUMS --ignore-missing`.
 
 ## Limits
 

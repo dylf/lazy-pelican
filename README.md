@@ -92,8 +92,10 @@ nobody has been on for a while.
 2. **Create a client API key as that user.** Log in as the agent's user, open the account menu, then **API Keys**.
    This is the account (client) key, which starts with `pacc_`. It is *not* the admin "Application" key under
    Admin > API Keys, which doesn't work for this. The key is shown once.
-3. **Get the binary** and the example config from the `agent/` directory (build with
-   `cd agent && go build -o lazy-agent ./cmd/lazy-agent`; there are no published releases yet).
+3. **Get the agent.** Releases made after the agent was added attach `lazy-agent_<version>_linux_<amd64|arm64>.tar.gz`
+   (binary, example config, systemd unit, compose file) and a `SHA256SUMS` file; a container image is published to
+   `ghcr.io/dylf/lazy-pelican-agent`. Neither has been published yet, so for now build it yourself:
+   `cd agent && go build -o lazy-agent ./cmd/lazy-agent`.
 4. **Write the config** (copy `agent/deploy/config.example.yml`). For each server you need its short identifier, from
    the console URL `https://panel/server/<id>/console`, and its game port(s) as players connect to them:
    ```yaml

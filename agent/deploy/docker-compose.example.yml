@@ -2,7 +2,9 @@
 # it needs no privileged mode and no access to the Docker socket.
 services:
   lazy-agent:
-    image: ghcr.io/dylf/lazy-pelican-agent:latest   # not published yet: build with `docker build -t ... agent/`
+    # Published from releases that include the agent. Until one exists, build it: `docker build -t lazy-pelican-agent agent/`
+    # and use `image: lazy-pelican-agent`.
+    image: ghcr.io/dylf/lazy-pelican-agent:latest
     restart: always
     network_mode: host
     cap_drop: [ALL]
