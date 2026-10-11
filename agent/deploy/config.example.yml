@@ -1,0 +1,35 @@
+# lazy-agent configuration. The API key is better kept out of this file: set LAZY_AGENT_API_KEY instead.
+panel_url: https://panel.example.com
+# api_key: pacc_...
+
+# Network interface to watch. "any" (the default) works for both bare-metal and Docker Wings.
+# interface: any
+
+# Never count traffic from these addresses. The panel's own address is added automatically.
+# ignore_sources: [10.0.0.50, 192.168.1.0/24]
+
+# When does a burst of packets count as a player trying to join?
+# detector:
+#   packets: 3       # this many non-query UDP packets...
+#   window: 5s       # ...from one source within this long
+#   holdoff: 30s     # then ignore the server for this long
+
+# Safety limits per server.
+# limits:
+#   cooldown: 5m          # after starting a server, ignore join attempts for this long
+#   max_wakes_per_hour: 6 # stops a scanner from making a server start over and over
+
+servers:
+  # `id` is the short identifier in the server's URL: https://panel/server/<id>/console
+  # `ports` are the server's game port(s) as the players see them (the allocation ports).
+  - name: palworld
+    id: 60455931
+    ports: [27002]
+
+  - name: valheim
+    id: dc93fa79
+    ports: [27000]          # the game port, NOT the query port (27001)
+    # Optional: only count packets that look like the game's own join traffic.
+    # match:
+    #   prefix: "2010000d"  # hex, no spaces
+    #   length: 512

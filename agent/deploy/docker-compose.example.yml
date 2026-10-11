@@ -1,0 +1,15 @@
+# Run next to Wings, on the Docker host. Host networking is what lets it see players' packets;
+# it needs no privileged mode and no access to the Docker socket.
+services:
+  lazy-agent:
+    image: ghcr.io/dylf/lazy-pelican-agent:latest   # not published yet: build with `docker build -t ... agent/`
+    restart: always
+    network_mode: host
+    cap_drop: [ALL]
+    cap_add: [NET_RAW]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      LAZY_AGENT_API_KEY: "pacc_..."
+    volumes:
+      - ./config.yml:/etc/lazy-agent/config.yml:ro

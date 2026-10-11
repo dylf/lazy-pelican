@@ -1,0 +1,26 @@
+[Unit]
+Description=lazy-agent: start Pelican game servers when players try to join
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/lazy-agent run -config /etc/lazy-agent/config.yml
+# Holds LAZY_AGENT_API_KEY=... (chmod 600, root-owned; systemd reads it before dropping privileges)
+EnvironmentFile=/etc/lazy-agent/env
+Restart=on-failure
+RestartSec=5s
+
+# Needs only the ability to read packets.
+DynamicUser=yes
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_PACKET AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
