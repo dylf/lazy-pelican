@@ -29,4 +29,7 @@ return [
 
     // Never wake one server more than this many times an hour (stops scanners making it start over and over).
     'wake_max_per_hour' => (int) env('LAZY_PELICAN_WAKE_MAX_PER_HOUR', 6),
+
+    // Agents the panel hasn't heard from for this many days are forgotten (they come back by themselves if they report in).
+    'agent_retention_days' => (int) env('LAZY_PELICAN_AGENT_RETENTION_DAYS', 7),
 ];

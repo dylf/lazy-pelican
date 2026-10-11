@@ -26,6 +26,7 @@
                         <th style="{{ $cell }}">Version</th>
                         <th style="{{ $cell }}">API key user</th>
                         <th style="{{ $cell }}">Last heard</th>
+                        <th style="{{ $cell }}"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -50,10 +51,22 @@
                             <td style="{{ $cell }}">{{ $agent->version }}</td>
                             <td style="{{ $cell }}">{{ $agent->user?->username ?? '?' }}</td>
                             <td style="{{ $cell }}">{{ $agent->last_seen_at->diffForHumans() }}</td>
+                            <td style="{{ $cell }} text-align: right;">
+                                @if ($state !== 'connected')
+                                    <x-filament::button size="xs" color="danger" outlined
+                                        wire:click="removeAgent({{ $agent->id }})"
+                                        wire:confirm="{{ trans('lazy-pelican::messages.admin_agent_remove_confirm') }}">
+                                        {{ trans('lazy-pelican::messages.admin_agent_remove') }}
+                                    </x-filament::button>
+                                @endif
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
+            <p style="font-size: .8rem; margin-top: .75rem; opacity: .75;">
+                {{ trans('lazy-pelican::messages.admin_agents_note', ['days' => $this->agentRetentionDays()]) }}
+            </p>
         @endif
     </x-filament::section>
 

@@ -23,6 +23,8 @@ class LazyPelicanPluginProvider extends ServiceProvider
             $schedule->command('lazy-pelican:check')
                 ->everyMinute()
                 ->withoutOverlapping(5);
+
+            $schedule->command('lazy-pelican:prune-agents')->daily();
         });
     }
 }

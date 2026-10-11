@@ -8,6 +8,7 @@ use Dylf\LazyPelican\Models\LazyPelicanAgent;
 use Dylf\LazyPelican\Models\LazyPelicanServer;
 use Dylf\LazyPelican\Services\IdleShutdownService;
 use Dylf\LazyPelican\Support\WakeServerRow;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
 
@@ -32,6 +33,28 @@ class LazyPelicanAdminPage extends Page
     public function getTitle(): string
     {
         return trans('lazy-pelican::messages.admin_title');
+    }
+
+    /** Forget one agent. A live agent reappears on its next heartbeat, so only ones that aren't connected are removable. */
+    public function removeAgent(int $id): void
+    {
+        abort_unless(static::canAccess(), 403);
+
+        $agent = LazyPelicanAgent::query()->find($id);
+
+        if ($agent && !$agent->isConnected()) {
+            $agent->delete();
+
+            Notification::make()
+                ->title(trans('lazy-pelican::messages.admin_agent_removed'))
+                ->success()
+                ->send();
+        }
+    }
+
+    public function agentRetentionDays(): int
+    {
+        return max(1, (int) config('lazy-pelican.agent_retention_days'));
     }
 
     public function playerCounterAvailable(): bool

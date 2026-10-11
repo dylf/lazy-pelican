@@ -104,6 +104,28 @@ class LazyPelicanAgent extends Model
         return NodeMatcher::matches($this->node_key, $node->id, $node->name, $node->fqdn);
     }
 
+    /**
+     * Forget agents that haven't reported in for $days days. Returns how many were removed.
+     */
+    public static function prune(int $days): int
+    {
+        return static::query()->where('last_seen_at', '<', now()->subDays(max(1, $days)))->delete();
+    }
+
+    /**
+     * The agents worth showing for a node: any that are connected or recently seen. If every agent for the node is
+     * long gone, just the most recent one, so "the agent isn't responding" still shows up instead of nothing.
+     *
+     * @return Collection<int, static>
+     */
+    public static function visibleForNode(Node $node): Collection
+    {
+        $agents = static::forNode($node);
+        $alive = $agents->filter(fn (self $agent) => $agent->state() !== self::STATE_OFFLINE)->values();
+
+        return $alive->isNotEmpty() ? $alive : $agents->take(1)->values();
+    }
+
     /** @return Collection<int, static> */
     public static function forNode(Node $node): Collection
     {

@@ -57,6 +57,7 @@ class LazyPelicanPlugin implements HasPluginSettings, Plugin
             $number('detector_holdoff', 0, trans('lazy-pelican::messages.detector_holdoff'), trans('lazy-pelican::messages.detector_holdoff_help')),
             $number('wake_cooldown', 0, trans('lazy-pelican::messages.wake_cooldown'), trans('lazy-pelican::messages.wake_cooldown_help')),
             $number('wake_max_per_hour', 1, trans('lazy-pelican::messages.wake_max_per_hour'), trans('lazy-pelican::messages.wake_max_per_hour_help')),
+            $number('agent_retention_days', 1, trans('lazy-pelican::messages.agent_retention_days'), trans('lazy-pelican::messages.agent_retention_days_help')),
         ];
     }
 
@@ -70,6 +71,7 @@ class LazyPelicanPlugin implements HasPluginSettings, Plugin
             'LAZY_PELICAN_DETECTOR_HOLDOFF' => $data['detector_holdoff'],
             'LAZY_PELICAN_WAKE_COOLDOWN' => $data['wake_cooldown'],
             'LAZY_PELICAN_WAKE_MAX_PER_HOUR' => $data['wake_max_per_hour'],
+            'LAZY_PELICAN_AGENT_RETENTION_DAYS' => $data['agent_retention_days'],
         ]);
 
         Notification::make()

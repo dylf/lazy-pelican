@@ -197,7 +197,7 @@ class LazyPelicanPage extends ServerFormPage
             return $lines;
         }
 
-        $agents = LazyPelicanAgent::forNode($server->node);
+        $agents = LazyPelicanAgent::visibleForNode($server->node);
 
         if ($agents->isEmpty()) {
             $lines[] = ['text' => trans('lazy-pelican::messages.agent_none'), 'color' => 'warning'];
