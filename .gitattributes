@@ -11,3 +11,4 @@
 /release-please-config.json export-ignore
 /.release-please-manifest.json export-ignore
 /agent export-ignore
+/screenshots export-ignore

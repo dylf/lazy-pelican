@@ -1,9 +1,16 @@
 # Lazy Pelican (Pelican plugin)
 
-Stops a game server automatically after it has had **no players** for a set time.
-Starting is manual: players you've added as subusers can press Start in the panel.
+Lazy server management for Pelican game servers.
 
-## How it works
+- **Sleep:** the plugin stops a server automatically after it has had **no players** for a set time.
+- **Wake (optional, experimental):** a small companion program, the [lazy-pelican-agent](agent/README.md), starts a
+  stopped server when someone tries to join it.
+
+Without the agent, starting stays manual: players you've added as subusers can press Start in the panel.
+
+![Lazy Pelican settings page for a server](./screenshots/config-form.png)
+
+## How idle shutdown works
 - Every minute a scheduled command (`lazy-pelican:check`) looks at each server that has idle shutdown enabled.
 - Player counts come from the **Player Counter** plugin's Game Query for the server's egg
   (A2S/Source for Valheim, the REST API for Palworld; see Games below).
@@ -28,7 +35,7 @@ Starting is manual: players you've added as subusers can press Start in the pane
 
 
 ## Games
-Idle Shutdown works with any game Player Counter can query. Tested so far:
+Lazy Pelican works with any game Player Counter can query. Tested so far:
 
 | Game | Game Query | Needs |
 |---|---|---|
@@ -40,7 +47,7 @@ down. It does not get stopped by mistake.
 
 ### Valheim: Public Server must be on
 The Valheim server only answers the Steam query when `-public 1`. With Public Server off, the player count is
-unavailable and Idle Shutdown can never stop the server. With a password set, "public" only means the server is
+unavailable and idle shutdown can never stop the server. With a password set, "public" only means the server is
 listed in the in-game browser. Use the **Source** query with offset 1 (game port 27000 -> query port 27001), and make
 sure the query port is also an allocation on the server so Docker maps it.
 
@@ -64,7 +71,7 @@ Set a non-empty `ADMIN_PASSWORD` on the server, or the query returns nothing.
 > **Experimental.** The agent has been tested on one Wings host with Valheim and Palworld, from one client machine.
 > Expect rough edges, and read "Status" below before relying on it.
 
-Idle Shutdown only stops servers. Starting one again when a player tries to join needs a small separate program, the
+The plugin on its own only stops servers. Starting one again when a player tries to join needs a small separate program, the
 **lazy-pelican-agent**, running on the Wings host, because the panel can't see network traffic. It is not part of the plugin
 zip and the plugin works fine without it. If you don't use it, friends with the Start permission can press Start in
 the panel instead.
@@ -77,14 +84,14 @@ player ──UDP──> game port (nothing listening: server is stopped)
 ```
 
 The first attempt always times out, because the game takes a minute or more to boot. Players retry. A stopped server
-also isn't in any in-game server list, so players join by address. Once it's up, Idle Shutdown stops it again after
+also isn't in any in-game server list, so players join by address. Once it's up, idle shutdown stops it again after
 nobody has been on for a while.
 
 **The panel is in charge.** You turn wake on per server in the panel, and the agent asks the panel what to watch. The
 agent's own config file is only the panel URL and which node it runs on.
 
 ### What you need
-- Idle Shutdown already working on the servers you want (see Setup above).
+- idle shutdown already working on the servers you want (see Setup above).
 - A Linux Wings host. The agent runs **on the Docker host next to Wings** (not inside the Wings container), whether
   Wings itself runs under systemd or in Docker. It needs `CAP_NET_RAW` to read packets, nothing else.
 - UDP port forwards from your router to the Wings host for each game port. The agent does not go through a reverse
@@ -122,7 +129,9 @@ agent's own config file is only the panel URL and which node it runs on.
 **Is it working?** The agent reports in every 30 seconds. **Admin > Lazy Pelican** lists each agent with its status
 (connected or not responding), whether packet capture works, its version and the user behind its key, and shows per
 server whether anything can wake it: an agent is connected for the node, it can capture packets, and its user may
-start the server. The same lines appear on the server's own Lazy Pelican page. It can't see your router, so port
+start the server. The same lines appear on the server's own Lazy Pelican page. Offline agents have a **Remove**
+button there, and agents not heard from for 7 days (setting: "Forget agents not heard from for") are removed
+automatically; a running agent simply reappears on its next heartbeat. It can't see your router, so port
 forwards still need checking by hand. Each wake is recorded in the server's activity log.
 
 **More than one node?** Set `node:` on each agent, so it only watches servers on its own host.
@@ -131,34 +140,13 @@ forwards still need checking by hand. Each wake is recorded in the server's acti
 cap are set in the panel and sent to the agent. You can still override any of them, or list `servers:` by hand, in the
 agent's config file; the local file wins. If the panel is unreachable the agent keeps the last config it received.
 
-### How it decides
-- Steam server queries (packets starting `FF FF FF FF`) are ignored. They're what scanners and server browsers send.
-- A player's client retries for several seconds, while a scanner usually sends one probe. So **3 non-query UDP packets
-  from one address within 5 seconds** counts as a join attempt (all three numbers are configurable).
-- It only starts a server the panel reports as **offline**.
-- After a start it leaves that server alone for a cooldown (default 5 minutes) and never starts one more than 6 times an
-  hour (default), so a scanner can't make a server start over and over.
-- If it can't read a server's state, it does nothing.
-- If the panel can't be reached, it keeps watching with the last config it received.
-
-### Status
-Tested:
-- Real packet captures of join attempts to stopped Valheim and Palworld servers, replayed through the detector.
-- Dry run and two real wakes of a Valheim server on a real Wings host, including a player getting in and Idle
-  Shutdown stopping it afterwards.
-- A flood of queries, single probes and unwatched ports against the real capture code, none of which start anything.
-
-**Not tested yet:**
-- **A Start-only user.** Every real run used the panel owner's key. The setup above is the intended one, but a
-  Start-only subuser has not yet been used to start a server.
-- A real wake of Palworld (only a dry run), the Docker image, and the systemd unit.
-- Players from outside your network, other platforms or game versions, and real internet scanners.
+How the agent decides what counts as a join attempt, what it tested against and its limits are in
+[agent/README.md](agent/README.md).
 
 ### Limits
-- Linux only, IPv4 only, UDP only.
-- Games that join through a relay or peer to peer (such as Valheim crossplay) send nothing to your port, so they can't
-  be woken.
-- Valheim must have **Public Server** on for Idle Shutdown to read its player count (see Games above). That also lists
+- Linux only, IPv4 only, UDP only. Games that join through a relay or peer to peer (such as Valheim crossplay) can't
+  be woken. See [agent/README.md](agent/README.md#limits).
+- Valheim must have **Public Server** on for idle shutdown to read its player count (see Games above). That also lists
   the server publicly while it's running.
 
 ## Config (env)
@@ -167,4 +155,7 @@ Tested:
 | `LAZY_PELICAN_DEFAULT_IDLE_MINUTES` | 15 |
 | `LAZY_PELICAN_DEFAULT_GRACE_MINUTES` | 10 |
 | `LAZY_PELICAN_VERBOSE` | false |
+
+The wake and agent settings (join detection thresholds, cooldown, hourly cap, agent retention) live in
+Admin > Plugins > Lazy Pelican > Settings.
 

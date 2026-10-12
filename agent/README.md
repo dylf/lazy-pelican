@@ -1,7 +1,7 @@
 # lazy-pelican-agent (experimental)
 
 Starts a stopped Pelican game server when a player tries to join it. It is the "wake" half of Lazy Pelican; the
-plugin's Idle Shutdown is the "sleep" half.
+plugin's idle shutdown is the "sleep" half.
 
 ```
 player ──UDP──> game port (nothing listening: server is stopped)
@@ -11,7 +11,7 @@ player ──UDP──> game port (nothing listening: server is stopped)
 ```
 
 The first attempt will still time out, because the game takes a minute or more to boot. Players retry. Once it's up,
-the plugin's Idle Shutdown stops it again after nobody has been on for a while.
+the plugin's idle shutdown stops it again after nobody has been on for a while.
 
 ## How it decides
 
@@ -94,6 +94,19 @@ Releases publish `ghcr.io/dylf/lazy-pelican-agent` (amd64 and arm64); to build i
 
 Each release attaches `lazy-pelican-agent_<version>_linux_<amd64|arm64>.tar.gz` (the binary plus the example config, systemd
 unit, compose file and `install.sh`) and `SHA256SUMS`. Check a download with `sha256sum -c SHA256SUMS --ignore-missing`.
+
+## Status
+Tested:
+- Real packet captures of join attempts to stopped Valheim and Palworld servers, replayed through the detector.
+- Dry run and two real wakes of a Valheim server on a real Wings host, including a player getting in and idle
+  shutdown stopping it afterwards.
+- A flood of queries, single probes and unwatched ports against the real capture code, none of which start anything.
+
+**Not tested yet:**
+- **A Start-only user.** Every real run used the panel owner's key. The setup in the main README is the intended one, but a
+  Start-only subuser has not yet been used to start a server.
+- A real wake of Palworld (only a dry run), the Docker image, and the systemd unit.
+- Players from outside your network, other platforms or game versions, and real internet scanners.
 
 ## Limits
 
