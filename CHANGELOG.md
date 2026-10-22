@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/dylf/lazy-pelican/compare/v1.1.0...v1.1.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* remove exec() from tests and disallow execution calls in phpstan ([241902a](https://github.com/dylf/lazy-pelican/commit/241902ab29bdf00223e81d39a722f41b735ea211))
+
 ## [1.1.0](https://github.com/dylf/lazy-pelican/compare/v1.0.0...v1.1.0) (2026-10-11)
 
 
