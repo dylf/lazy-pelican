@@ -5,7 +5,7 @@
     "version": "1.1.1",
     "description": "Lazy server management for Pelican: stop game servers when nobody is playing, and start them when someone tries to join",
     "url": "https://github.com/dylf/lazy-pelican",
-    "update_url": "https://github.com/dylf/lazy-pelican/releases/latest/download/update.json",
+    "update_url": "https://hub.pelican.dev/plugins/lazy-pelican/update.json",
     "category": "plugin",
     "namespace": "Dylf\\LazyPelican",
     "class": "LazyPelicanPlugin",
