@@ -8,6 +8,10 @@ parameters:
     paths:
         - plugins
 
+    excludePaths:
+        analyse:
+            - plugins/player-counter
+
     level: 6
 
     ignoreErrors:
