@@ -145,6 +145,7 @@ jobs:
         run: |
           cd pelican
           composer require "xpaw/php-minecraft-query:^5.0.0" "xpaw/php-source-query-class:^6.0.0"
+          composer require --dev "spaze/phpstan-disallowed-calls"
 
       - name: Setup .env file
         run: cp pelican/.env.example pelican/.env

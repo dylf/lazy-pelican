@@ -99,10 +99,14 @@ class PluginStructureTest extends TestCase
     public function test_every_php_file_has_valid_syntax(): void
     {
         foreach ($this->phpFiles('src') as $file) {
-            exec(escapeshellarg(PHP_BINARY) . ' -l ' . escapeshellarg($file) . ' 2>&1', $output, $code);
-            $this->assertSame(0, $code, "Syntax error in $file: " . implode("\n", $output));
-            $output = [];
+            try {
+                token_get_all((string) file_get_contents($file), TOKEN_PARSE);
+            } catch (\ParseError $e) {
+                $this->fail("Syntax error in $file: " . $e->getMessage() . ' on line ' . $e->getLine());
+            }
         }
+
+        $this->addToAssertionCount(1);
     }
 
     public function test_every_namespace_matches_its_directory(): void
